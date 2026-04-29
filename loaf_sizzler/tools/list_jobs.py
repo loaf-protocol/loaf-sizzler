@@ -1,6 +1,6 @@
 """Stub for the list_jobs tool."""
 
 
-def list_jobs(args, axl_client, contract_client):
+def list_jobs(args: dict, contract) -> dict:
     """Read open jobs from the contract."""
     return {"status": "not implemented"}

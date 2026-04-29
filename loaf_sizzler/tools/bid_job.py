@@ -1,6 +1,8 @@
 """Stub for the bid_job tool."""
 
 
-def bid_job(args, axl_client, contract_client):
+def bid_job(args: dict, axl) -> dict:
     """Send a bid to the poster agent over AXL."""
-    return {"status": "not implemented"}
+    own_key = axl.get_own_key()
+    axl.send_bid(args.get("poster_axl_key"), args.get("job_id"), own_key)
+    return {"status": "bid_sent"}
