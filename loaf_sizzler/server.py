@@ -86,12 +86,12 @@ class MCPServer:
                 elif name == "bid_job":
                     result = bid_job(args, self.axl_client)
                 elif name == "submit_work":
-                    result = submit_work(args, self.contract_client, self.storage)
+                    result = submit_work(args, self.storage, self.contract_client)
                 elif name == "bid_verify":
                     result = bid_verify(args, self.axl_client)
                 elif name == "get_output":
-                    caller_id = request.headers.get("X-From-Peer-Id")
-                    result = get_output(args, self.contract_client, self.storage, caller_id=caller_id)
+                    caller_id = request.headers.get("X-From-Peer-Id", "")
+                    result = get_output(args, self.storage, self.contract_client, caller_id)
                 elif name == "submit_verdict":
                     result = submit_verdict(args, self.axl_client, self.contract_client)
                 elif name == "get_balance":

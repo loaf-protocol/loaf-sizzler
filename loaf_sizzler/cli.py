@@ -11,7 +11,7 @@ import requests
 from loaf_sizzler.axl_client import AxlClient
 from loaf_sizzler.keeperhub_client import KeeperHubClient
 from loaf_sizzler.server import MCPServer
-from loaf_sizzler.storage import Storage
+from loaf_sizzler.storage import create_storage
 
 load_dotenv()
 # Default configuration
@@ -30,11 +30,20 @@ REQUIRED_ENV = [
 class LoafSizzler:
     """Main application class for loaf-sizzler runtime."""
 
-    def __init__(self, port: int = 7100, router_url: str = MCP_ROUTER_URL, axl_url: str = AXL_NODE_URL):
+    def __init__(
+        self,
+        port: int = 7100,
+        axl_url: str = AXL_NODE_URL,
+        router_url: str = MCP_ROUTER_URL,
+        storage_backend: str = "memory",
+        db_path: str = "loaf.db",
+    ):
         """Initialize loaf-sizzler with configuration."""
         self.port = port
-        self.router_url = router_url
         self.axl_url = axl_url
+        self.router_url = router_url
+        self.storage_backend = storage_backend
+        self.db_path = db_path
 
         self.storage = None
         self.keeperhub = None
@@ -49,8 +58,11 @@ class LoafSizzler:
             print("[loaf-sizzler] loading environment...")
             self._load_env()
 
-            print("[loaf-sizzler] initializing storage...")
-            self.storage = Storage()
+            if self.storage_backend == "sqlite":
+                print(f"[loaf-sizzler] initializing storage (sqlite) → {self.db_path}...")
+            else:
+                print("[loaf-sizzler] initializing storage (memory)...")
+            self.storage = create_storage(self.storage_backend, self.db_path)
 
             print("[loaf-sizzler] connecting to KeeperHub...")
             self.keeperhub = KeeperHubClient()
@@ -143,6 +155,19 @@ def main():
     start_parser.add_argument("--port", type=int, default=7100, help="MCP server port (default: 7100)")
     start_parser.add_argument("--router-url", type=str, default="http://localhost:9003", help="MCP router URL")
     start_parser.add_argument("--axl-url", type=str, default="http://localhost:9002", help="AXL node URL")
+    start_parser.add_argument(
+        "--storage",
+        type=str,
+        default="memory",
+        choices=["memory", "sqlite"],
+        help="Storage backend (default: memory)",
+    )
+    start_parser.add_argument(
+        "--db-path",
+        type=str,
+        default="loaf.db",
+        help="SQLite database path (default: loaf.db)",
+    )
 
     args = parser.parse_args()
 
@@ -150,7 +175,9 @@ def main():
         sizzler = LoafSizzler(
             port=args.port,
             axl_url=args.axl_url,
-            router_url=args.router_url
+            router_url=args.router_url,
+            storage_backend=args.storage,
+            db_path=args.db_path,
         )
         sizzler.start()
     else:
