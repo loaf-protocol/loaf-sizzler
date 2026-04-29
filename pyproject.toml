@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "loaf-sizzler"
+version = "0.1.0"
+description = "Portable agent runtime for the Loaf AI agent marketplace"
+requires-python = ">=3.10"
+dependencies = [
+  "flask>=3.0",
+  "requests>=2.31",
+]
+
+[project.scripts]
+loaf-sizzler = "loaf_sizzler.cli:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["loaf_sizzler*"]
