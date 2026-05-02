@@ -1,0 +1,802 @@
+[
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_usdc",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "job_id",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "worker",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "worker_axl_key",
+          "type": "string"
+        }
+      ],
+      "name": "BidAccepted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "job_id",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "worker",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "payment",
+          "type": "uint256"
+        }
+      ],
+      "name": "JobComplete",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "job_id",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "poster",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "refund",
+          "type": "uint256"
+        }
+      ],
+      "name": "JobFailed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "job_id",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "poster",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "poster_axl_key",
+          "type": "string"
+        }
+      ],
+      "name": "JobPosted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "job_id",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "verifier",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "pass",
+          "type": "bool"
+        }
+      ],
+      "name": "VerdictSubmitted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "job_id",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "verifier",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "verifier_axl_key",
+          "type": "string"
+        }
+      ],
+      "name": "VerifierAccepted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "job_id",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "output_hash",
+          "type": "string"
+        }
+      ],
+      "name": "WorkSubmitted",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "job_id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "worker",
+          "type": "address"
+        },
+        {
+          "internalType": "string",
+          "name": "worker_axl_key",
+          "type": "string"
+        }
+      ],
+      "name": "acceptBid",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "job_id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "verifier",
+          "type": "address"
+        },
+        {
+          "internalType": "string",
+          "name": "verifier_axl_key",
+          "type": "string"
+        }
+      ],
+      "name": "acceptVerifier",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "job_id",
+          "type": "uint256"
+        }
+      ],
+      "name": "getJob",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "job_id",
+              "type": "uint256"
+            },
+            {
+              "internalType": "string",
+              "name": "criteria",
+              "type": "string"
+            },
+            {
+              "internalType": "uint256",
+              "name": "payment",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint8",
+              "name": "verifier_count",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "reputation_tier",
+              "type": "uint8"
+            },
+            {
+              "internalType": "address",
+              "name": "poster",
+              "type": "address"
+            },
+            {
+              "internalType": "string",
+              "name": "poster_axl_key",
+              "type": "string"
+            },
+            {
+              "internalType": "address",
+              "name": "worker",
+              "type": "address"
+            },
+            {
+              "internalType": "string",
+              "name": "worker_axl_key",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "output_hash",
+              "type": "string"
+            },
+            {
+              "internalType": "enum LoafEscrow.JobStatus",
+              "name": "status",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "pass_votes",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "fail_votes",
+              "type": "uint8"
+            },
+            {
+              "internalType": "address[]",
+              "name": "verifiers",
+              "type": "address[]"
+            },
+            {
+              "internalType": "string[]",
+              "name": "verifier_axl_keys",
+              "type": "string[]"
+            }
+          ],
+          "internalType": "struct LoafEscrow.Job",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getOpenJobs",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "job_id",
+              "type": "uint256"
+            },
+            {
+              "internalType": "string",
+              "name": "criteria",
+              "type": "string"
+            },
+            {
+              "internalType": "uint256",
+              "name": "payment",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint8",
+              "name": "verifier_count",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "reputation_tier",
+              "type": "uint8"
+            },
+            {
+              "internalType": "address",
+              "name": "poster",
+              "type": "address"
+            },
+            {
+              "internalType": "string",
+              "name": "poster_axl_key",
+              "type": "string"
+            },
+            {
+              "internalType": "address",
+              "name": "worker",
+              "type": "address"
+            },
+            {
+              "internalType": "string",
+              "name": "worker_axl_key",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "output_hash",
+              "type": "string"
+            },
+            {
+              "internalType": "enum LoafEscrow.JobStatus",
+              "name": "status",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "pass_votes",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "fail_votes",
+              "type": "uint8"
+            },
+            {
+              "internalType": "address[]",
+              "name": "verifiers",
+              "type": "address[]"
+            },
+            {
+              "internalType": "string[]",
+              "name": "verifier_axl_keys",
+              "type": "string[]"
+            }
+          ],
+          "internalType": "struct LoafEscrow.Job[]",
+          "name": "",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "job_id",
+          "type": "uint256"
+        }
+      ],
+      "name": "getOutputHash",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "agent",
+          "type": "address"
+        }
+      ],
+      "name": "getReputation",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "score",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "jobs_completed",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "jobs_failed",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "verdicts_given",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct LoafEscrow.Reputation",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getReviewJobs",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "job_id",
+              "type": "uint256"
+            },
+            {
+              "internalType": "string",
+              "name": "criteria",
+              "type": "string"
+            },
+            {
+              "internalType": "uint256",
+              "name": "payment",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint8",
+              "name": "verifier_count",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "reputation_tier",
+              "type": "uint8"
+            },
+            {
+              "internalType": "address",
+              "name": "poster",
+              "type": "address"
+            },
+            {
+              "internalType": "string",
+              "name": "poster_axl_key",
+              "type": "string"
+            },
+            {
+              "internalType": "address",
+              "name": "worker",
+              "type": "address"
+            },
+            {
+              "internalType": "string",
+              "name": "worker_axl_key",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "output_hash",
+              "type": "string"
+            },
+            {
+              "internalType": "enum LoafEscrow.JobStatus",
+              "name": "status",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "pass_votes",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "fail_votes",
+              "type": "uint8"
+            },
+            {
+              "internalType": "address[]",
+              "name": "verifiers",
+              "type": "address[]"
+            },
+            {
+              "internalType": "string[]",
+              "name": "verifier_axl_keys",
+              "type": "string[]"
+            }
+          ],
+          "internalType": "struct LoafEscrow.Job[]",
+          "name": "",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "job_id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "axl_key",
+          "type": "string"
+        }
+      ],
+      "name": "isAssignedVerifier",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "job_counter",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "jobs",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "job_id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "criteria",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "payment",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint8",
+          "name": "verifier_count",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "reputation_tier",
+          "type": "uint8"
+        },
+        {
+          "internalType": "address",
+          "name": "poster",
+          "type": "address"
+        },
+        {
+          "internalType": "string",
+          "name": "poster_axl_key",
+          "type": "string"
+        },
+        {
+          "internalType": "address",
+          "name": "worker",
+          "type": "address"
+        },
+        {
+          "internalType": "string",
+          "name": "worker_axl_key",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "output_hash",
+          "type": "string"
+        },
+        {
+          "internalType": "enum LoafEscrow.JobStatus",
+          "name": "status",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "pass_votes",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "fail_votes",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "criteria",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "payment",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint8",
+          "name": "verifier_count",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "reputation_tier",
+          "type": "uint8"
+        },
+        {
+          "internalType": "string",
+          "name": "poster_axl_key",
+          "type": "string"
+        }
+      ],
+      "name": "postJob",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "reputations",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "score",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "jobs_completed",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "jobs_failed",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "verdicts_given",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "job_id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "pass",
+          "type": "bool"
+        }
+      ],
+      "name": "submitVerdict",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "job_id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "output_hash",
+          "type": "string"
+        }
+      ],
+      "name": "submitWork",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "usdc",
+      "outputs": [
+        {
+          "internalType": "contract IERC20",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ]
