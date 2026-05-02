@@ -9,7 +9,7 @@ import sys
 import requests
 
 from loaf_sizzler.axl_client import AxlClient
-from loaf_sizzler.keeperhub_client import KeeperHubClient
+from loaf_sizzler.contract_client import ContractClient
 from loaf_sizzler.server import MCPServer
 from loaf_sizzler.storage import create_storage
 
@@ -24,6 +24,8 @@ REQUIRED_ENV = [
     "AGENT_PRIVATE_KEY",
     "KEEPERHUB_API_KEY",
     "CONTRACT_ADDRESS",
+    "AXL_NODE_URL",
+    "MCP_ROUTER_URL",
 ]
 
 
@@ -32,11 +34,11 @@ class LoafSizzler:
 
     def __init__(
         self,
-        port: int = 7100,
-        axl_url: str = AXL_NODE_URL,
-        router_url: str = MCP_ROUTER_URL,
-        storage_backend: str = "memory",
-        db_path: str = "loaf.db",
+        port=7100,
+        axl_url="http://localhost:9002",
+        router_url="http://localhost:9003",
+        storage_backend="memory",
+        db_path="loaf.db",
     ):
         """Initialize loaf-sizzler with configuration."""
         self.port = port
@@ -44,43 +46,40 @@ class LoafSizzler:
         self.router_url = router_url
         self.storage_backend = storage_backend
         self.db_path = db_path
-
         self.storage = None
-        self.keeperhub = None
         self.axl = None
+        self.contract = None
         self.server = None
 
     def start(self):
         """Execute full startup sequence."""
         try:
             self._setup_signal_handlers()
-
-            print("[loaf-sizzler] loading environment...")
             self._load_env()
 
-            if self.storage_backend == "sqlite":
-                print(f"[loaf-sizzler] initializing storage (sqlite) → {self.db_path}...")
-            else:
-                print("[loaf-sizzler] initializing storage (memory)...")
+            print("[loaf-sizzler] initializing storage...")
             self.storage = create_storage(self.storage_backend, self.db_path)
-
-            print("[loaf-sizzler] connecting to KeeperHub...")
-            self.keeperhub = KeeperHubClient()
-
-            print("[loaf-sizzler] setting up workflows...")
-            self.keeperhub.setup()
 
             print(f"[loaf-sizzler] connecting to AXL node at {self.axl_url}...")
             self.axl = AxlClient(self.axl_url)
             print(f"[loaf-sizzler] AXL public key: {self.axl.get_own_key()}")
 
+            print("[loaf-sizzler] initializing contract client...")
+            self.contract = ContractClient(self.axl, self.storage)
+            self.contract.setup()
+
             print(f"[loaf-sizzler] starting MCP server on port {self.port}...")
-            self.server = MCPServer(self.axl, self.keeperhub, self.storage, port=self.port)
+            self.server = MCPServer(
+                self.axl,
+                self.contract,
+                self.storage,
+                port=self.port,
+            )
 
             print(f"[loaf-sizzler] registering with MCP router at {self.router_url}...")
             self._register()
 
-            print(f"[loaf-sizzler] ready. agents can now connect to http://localhost:{self.port}/mcp")
+            print(f"[loaf-sizzler] ready. agents can connect to http://localhost:{self.port}/mcp")
             self.server.start()
 
         except Exception as e:
