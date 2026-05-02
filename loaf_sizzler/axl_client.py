@@ -39,7 +39,13 @@ class AxlClient:
         except Exception as exc:
             return {"error": str(exc)}
 
-    def send_bid(self, poster_axl_key: str, job_id: str, bidder_axl_key: str) -> dict:
+    def send_bid(
+        self,
+        poster_axl_key: str,
+        job_id: str,
+        bidder_axl_key: str,
+        proposed_amount: int,
+    ) -> dict:
         """Worker sends a bid message to a poster agent."""
         return self.send(
             poster_axl_key,
@@ -47,6 +53,7 @@ class AxlClient:
                 "type": "bid",
                 "job_id": job_id,
                 "bidder_axl_key": bidder_axl_key,
+                "proposed_amount": proposed_amount,
             },
         )
 
@@ -116,14 +123,13 @@ class AxlClient:
             return {"error": str(exc)}
 
     def get_own_key(self) -> str:
-        """Fetch own AXL public key from the local node identity endpoint."""
+        """
+        Fetch AXL public key from node topology.
+        GET {AXL_NODE_URL}/topology
+        Cache result in self.own_key after first call.
+        """
         if self.own_key:
             return self.own_key
-
-        try:
-            response = requests.get(f"{self.node_url}/topology", timeout=10)
-            data = response.json()
-            self.own_key = data["our_public_key"]
-            return self.own_key
-        except Exception:
-            return None
+        response = requests.get(f"{self.node_url}/topology")
+        self.own_key = response.json()["our_public_key"]
+        return self.own_key
