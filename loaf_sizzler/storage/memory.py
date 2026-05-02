@@ -5,6 +5,7 @@ class MemoryStorage(BaseStorage):
     def __init__(self):
         self._inbox: list = []
         self._outputs: dict = {}
+        self._agent: dict = {}
 
     def add_message(self, message: dict) -> None:
         self._inbox.append(message)
@@ -32,3 +33,9 @@ class MemoryStorage(BaseStorage):
 
     def has_output(self, job_id: str) -> bool:
         return job_id in self._outputs
+
+    def set_agent_data(self, key: str, value: str) -> None:
+        self._agent[key] = value
+
+    def get_agent_data(self, key: str) -> str | None:
+        return self._agent.get(key)

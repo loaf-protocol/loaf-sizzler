@@ -39,3 +39,11 @@ class BaseStorage(ABC):
     @abstractmethod
     def has_output(self, job_id: str) -> bool:
         """Check if output exists for a job_id."""
+
+    @abstractmethod
+    def set_agent_data(self, key: str, value: str) -> None:
+        """Store agent metadata (profileId, wallet, axl_key)"""
+
+    @abstractmethod
+    def get_agent_data(self, key: str) -> str | None:
+        """Retrieve agent metadata by key"""

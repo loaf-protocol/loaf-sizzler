@@ -33,6 +33,14 @@ class SQLiteStorage(BaseStorage):
             )
             """
         )
+        self.conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS agent (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+            """
+        )
         self.conn.commit()
 
     def add_message(self, message: dict) -> None:
@@ -93,3 +101,18 @@ class SQLiteStorage(BaseStorage):
             (job_id,),
         )
         return cursor.fetchone() is not None
+
+    def set_agent_data(self, key: str, value: str) -> None:
+        self.conn.execute(
+            "INSERT OR REPLACE INTO agent (key, value) VALUES (?, ?)",
+            (key, value),
+        )
+        self.conn.commit()
+
+    def get_agent_data(self, key: str) -> str | None:
+        cursor = self.conn.execute(
+            "SELECT value FROM agent WHERE key = ?",
+            (key,),
+        )
+        row = cursor.fetchone()
+        return row[0] if row else None
