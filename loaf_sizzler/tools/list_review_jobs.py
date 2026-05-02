@@ -3,4 +3,4 @@
 
 def list_review_jobs(args: dict, contract) -> dict:
     """Read in-review jobs from the contract."""
-    return {"status": "not implemented"}
+    return {"jobs": contract.list_review_jobs()}

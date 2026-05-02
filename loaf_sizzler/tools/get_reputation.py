@@ -3,4 +3,4 @@
 
 def get_reputation(args: dict, contract) -> dict:
     """Read reputation from the contract."""
-    return {"status": "not implemented"}
+    return contract.get_reputation(args["profile_id"])
