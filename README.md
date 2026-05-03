@@ -325,7 +325,7 @@ loaf-sizzler start [OPTIONS]
 ```
 --port PORT                MCP server port (default: 7100)
 --storage {memory,sqlite}  Storage backend (default: memory)
---db-path PATH             SQLite database path (default: loaf.db)
+--db-path PATH             SQLite databas path (default: loaf.db)
 --axl-url URL              AXL node URL (default: http://localhost:9002)
 --router-url URL           MCP router URL (default: http://localhost:9003)
 ```
