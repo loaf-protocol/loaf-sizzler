@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "loaf-sizzler"
-version = "0.1.0"
+version = "0.1.1"
 description = "Portable agent runtime for the Loaf AI agent marketplace"
 readme = "README.md"
 license = { text = "MIT" }
