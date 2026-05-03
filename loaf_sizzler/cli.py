@@ -13,6 +13,8 @@ from loaf_sizzler.contract_client import ContractClient
 from loaf_sizzler.server import MCPServer
 from loaf_sizzler.storage import create_storage
 
+
+
 load_dotenv()
 # Default configuration
 MCP_SERVER_PORT = 7100
@@ -20,8 +22,7 @@ MCP_ROUTER_URL = "http://localhost:9003"
 AXL_NODE_URL = "http://localhost:9002"
 
 # Required environment variables
-REQUIRED_ENV = [
-    "AGENT_PRIVATE_KEY",
+REQUIRED = [
     "KEEPERHUB_API_KEY",
     "CONTRACT_ADDRESS",
     "AXL_NODE_URL",
@@ -55,6 +56,8 @@ class LoafSizzler:
         """Execute full startup sequence."""
         try:
             self._setup_signal_handlers()
+
+            print("[loaf-sizzler] loading environment...")
             self._load_env()
 
             print("[loaf-sizzler] initializing storage...")
@@ -64,9 +67,11 @@ class LoafSizzler:
             self.axl = AxlClient(self.axl_url)
             print(f"[loaf-sizzler] AXL public key: {self.axl.get_own_key()}")
 
-            print("[loaf-sizzler] initializing contract client...")
+            print("[loaf-sizzler] connecting to KeeperHub...")
             self.contract = ContractClient(self.axl, self.storage)
             self.contract.setup()
+            if self.contract.config and self.contract.config.wallet_address:
+                print(f"[loaf-sizzler] wallet: {self.contract.config.wallet_address}")
 
             print(f"[loaf-sizzler] starting MCP server on port {self.port}...")
             self.server = MCPServer(
@@ -88,9 +93,9 @@ class LoafSizzler:
             sys.exit(1)
 
     def _load_env(self):
-        """Validate all required environment variables."""
+        """Validate all required environment variables and config."""
         missing = []
-        for var in REQUIRED_ENV:
+        for var in REQUIRED:
             if not os.getenv(var):
                 missing.append(var)
 
@@ -99,6 +104,19 @@ class LoafSizzler:
                 f"[loaf-sizzler] missing required environment variables: {', '.join(missing)}",
                 file=sys.stderr,
             )
+            sys.exit(1)
+
+        # Ensure workflow config exists
+        try:
+            from loaf_sizzler.config import LoafConfig
+
+            if not LoafConfig().is_setup():
+                print("[loaf-sizzler] ❌ not configured. Run: loaf-sizzler setup")
+                sys.exit(1)
+        except SystemExit:
+            raise
+        except Exception:
+            print("[loaf-sizzler] ❌ config check failed — run: loaf-sizzler setup", file=sys.stderr)
             sys.exit(1)
 
     def _register(self):
@@ -168,9 +186,21 @@ def main():
         help="SQLite database path (default: loaf.db)",
     )
 
+    # setup subcommand
+    setup_parser = subparsers.add_parser(
+        "setup",
+        help="First time setup — duplicate KeeperHub workflows into your org",
+    )
+
     args = parser.parse_args()
 
-    if args.command == "start":
+    if args.command == "setup":
+        from loaf_sizzler.setup import LoafSetup
+
+        setup = LoafSetup()
+        setup.run()
+
+    elif args.command == "start":
         sizzler = LoafSizzler(
             port=args.port,
             axl_url=args.axl_url,
