@@ -44,6 +44,7 @@ class MCPServer:
             payload = request.get_json(silent=True) or {}
             method = payload.get("method")
             request_id = payload.get("id")
+            print(payload)
 
             if method == "tools/list":
                 result = {
@@ -96,6 +97,7 @@ class MCPServer:
                     result = bid_verify(args, self.axl_client)
 
                 elif name == "list_jobs":
+                    print(args)
                     result = list_jobs(args, self.contract_client)
 
                 elif name == "list_review_jobs":
@@ -141,7 +143,7 @@ class MCPServer:
     def start(self) -> None:
         """Run the server on the configured port."""
         app = self.create_app()
-        app.run(host="0.0.0.0", port=self.port)
+        app.run(host="0.0.0.0", port=self.port, debug=True)
 
 
 def create_app(axl_client, contract_client, storage, port: int = 7100) -> Flask:
