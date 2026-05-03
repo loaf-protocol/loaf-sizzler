@@ -1,0 +1,24 @@
+{
+  "workflow_ids": {
+    "register_profile": "u9iha43z5nmmd6g9nuhat",
+    "post_job": "qol0ta3os067z777iyq17",
+    "approve_usdc": "zf6ipo9jbnwoeubz99k9i",
+    "accept_bid": "r6z8jxewzlr7a9pwtq95b",
+    "assign_verifier": "sltyxz1mprxgm8t0cn1f6",
+    "submit_work": "vtsg4dco7h6ztjayveyxz",
+    "submit_verdict": "dukjzqg2uhsl6llpyejv1",
+    "claim_expired": "tiiv1nper9clb8dqy3ut3",
+    "update_axl_key": "l4o700cd4slbyvi03s8v1",
+    "get_job": "ik6p202kov48vwcg75lvp",
+    "get_profile": "fpatax0idlfpazz78aohb",
+    "get_profile_addr": "tkc3yacc0bhl1f7x1hqjq",
+    "get_profile_id": "kkbsi1o43jg565p2qspqc",
+    "get_jobs_by_state": "spf5xxg0ugb8hyow95i4q",
+    "get_verifier_ids": "13zsbobfmpqzam0hv3stg",
+    "get_job_count": "vdjqevojgjpr9y26agn4n"
+  },
+  "project_id": "yjxzykhjckzitw6nnbpm8",
+  "wallet_address": "0x6452ef500a55741bc649b722c34c397e539f8760",
+  "wallet_id": "f6da2dad-9847-5b00-8fef-17166c7c2de9",
+  "setup_at": "2026-05-03T12:48:43.232568Z"
+}
