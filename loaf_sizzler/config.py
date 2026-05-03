@@ -5,6 +5,20 @@ from pathlib import Path
 CONFIG_FILE = ".loaf_config.json"
 
 
+def load_project_env(cwd: str | os.PathLike[str] | None = None) -> Path | None:
+    """Load .env from the user's current project directory or its parents."""
+    from dotenv import load_dotenv
+
+    root = (Path(cwd) if cwd is not None else Path.cwd()).resolve()
+    for path in [root, *root.parents]:
+        env_path = path / ".env"
+        if env_path.exists():
+            load_dotenv(dotenv_path=env_path)
+            return env_path
+
+    return None
+
+
 class LoafConfig:
     def __init__(self):
         self.workflow_ids = {}

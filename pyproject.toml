@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "loaf-sizzler"
-version = "0.1.2"
+version = "0.1.3"
 description = "Portable agent runtime for the Loaf AI agent marketplace"
 readme = "README.md"
 license = { text = "MIT" }
@@ -23,6 +23,7 @@ classifiers = [
 ]
 dependencies = [
     "flask>=3.0",
+    "python-dotenv>=1.0",
     "requests>=2.31",
 ]
 

@@ -1,6 +1,4 @@
 """CLI entry point for loaf-sizzler."""
-from dotenv import load_dotenv
-
 import argparse
 import os
 import signal
@@ -9,13 +7,13 @@ import sys
 import requests
 
 from loaf_sizzler.axl_client import AxlClient
+from loaf_sizzler.config import load_project_env
 from loaf_sizzler.contract_client import ContractClient
 from loaf_sizzler.server import MCPServer
 from loaf_sizzler.storage import create_storage
 
 
 
-load_dotenv()
 # Default configuration
 MCP_SERVER_PORT = 7100
 MCP_ROUTER_URL = "http://localhost:9003"
@@ -36,8 +34,8 @@ class LoafSizzler:
     def __init__(
         self,
         port=7100,
-        axl_url="http://localhost:9002",
-        router_url="http://localhost:9003",
+        axl_url=None,
+        router_url=None,
         storage_backend="memory",
         db_path="loaf.db",
     ):
@@ -94,9 +92,22 @@ class LoafSizzler:
 
     def _load_env(self):
         """Validate all required environment variables and config."""
+        env_path = load_project_env()
+        if env_path:
+            print(f"[loaf-sizzler] loaded environment from {env_path}")
+
+        self.axl_url = self.axl_url or os.getenv("AXL_NODE_URL")
+        self.router_url = self.router_url or os.getenv("MCP_ROUTER_URL")
+
         missing = []
-        for var in REQUIRED:
-            if not os.getenv(var):
+        required_values = {
+            "KEEPERHUB_API_KEY": os.getenv("KEEPERHUB_API_KEY"),
+            "CONTRACT_ADDRESS": os.getenv("CONTRACT_ADDRESS"),
+            "AXL_NODE_URL": self.axl_url,
+            "MCP_ROUTER_URL": self.router_url,
+        }
+        for var, value in required_values.items():
+            if not value:
                 missing.append(var)
 
         if missing:
@@ -170,8 +181,8 @@ def main():
     # start subcommand
     start_parser = subparsers.add_parser("start", help="Start the loaf-sizzler runtime")
     start_parser.add_argument("--port", type=int, default=7100, help="MCP server port (default: 7100)")
-    start_parser.add_argument("--router-url", type=str, default="http://localhost:9003", help="MCP router URL")
-    start_parser.add_argument("--axl-url", type=str, default="http://localhost:9002", help="AXL node URL")
+    start_parser.add_argument("--router-url", type=str, default=None, help="MCP router URL (defaults to MCP_ROUTER_URL)")
+    start_parser.add_argument("--axl-url", type=str, default=None, help="AXL node URL (defaults to AXL_NODE_URL)")
     start_parser.add_argument(
         "--storage",
         type=str,
@@ -195,6 +206,7 @@ def main():
     args = parser.parse_args()
 
     if args.command == "setup":
+        load_project_env()
         from loaf_sizzler.setup import LoafSetup
 
         setup = LoafSetup()

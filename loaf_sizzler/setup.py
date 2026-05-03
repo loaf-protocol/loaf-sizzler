@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 from datetime import datetime
 from pathlib import Path
 import requests
 
-KEEPERHUB_API_KEY = __import__('os').getenv("KEEPERHUB_API_KEY")
 KEEPERHUB_BASE_URL = "https://app.keeperhub.com/api"
 CONFIG_FILE = ".loaf_config.json"
 
@@ -35,9 +35,14 @@ SOURCE_WORKFLOW_IDS = {
 
 class LoafSetup:
     def __init__(self):
+        api_key = os.getenv("KEEPERHUB_API_KEY")
+        if not api_key:
+            print("[setup] ❌ missing KEEPERHUB_API_KEY. Add it to .env or export it before running setup.")
+            exit(1)
+
         self.base_url = KEEPERHUB_BASE_URL
         self.headers = {
-            "Authorization": f"Bearer {KEEPERHUB_API_KEY}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
         self.workflow_ids: dict = {}
