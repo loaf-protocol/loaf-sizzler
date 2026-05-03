@@ -1,12 +1,8 @@
-"""Tool for explicit profile registration."""
-
-
 def register_profile(args: dict, contract) -> dict:
-    """
-    Explicit registration tool.
-    Agent can call this directly if they want.
-    contract._ensure_registered()
-    return { "status": "registered", "profile_id": ... }
-    """
-    profile_id = contract._ensure_registered()
+    axl_key = args.get("axlPublicKey") or contract.axl_client.get_own_key()
+    result = contract.register_profile(axl_key)
+    if result.get("error"):
+        return result
+
+    profile_id = result.get("profileId")
     return {"status": "registered", "profile_id": profile_id}

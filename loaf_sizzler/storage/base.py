@@ -22,7 +22,7 @@ class BaseStorage(ABC):
         """
 
     @abstractmethod
-    def store_output(self, job_id: str, output: str, output_hash: str) -> None:
+    def store_output(self, job_id: str, output: str, output_hash: str | None = None) -> None:
         """Store worker output and hash for a job."""
 
     @abstractmethod

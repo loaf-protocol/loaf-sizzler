@@ -2,17 +2,22 @@ import hashlib
 
 
 def get_output(args: dict, contract, storage, caller_id: str) -> dict:
-   """
-   PUBLIC tool — called by remote verifiers over AXL.
-   Returns stored worker output for a job.
-
-   args: { job_id }
-   caller_id: X-From-Peer-Id header (verifier's AXL key)
-   """
-   job_id = args.get("job_id")
-
+   job_id = args["job_id"]
+    
+   # auth check — is caller an assigned verifier?
+   if caller_id:
+      # get caller's profile to find their profileId
+      profile = contract.get_profile_by_address_or_axl_key(caller_id)
+      if profile:
+         is_assigned = contract.is_assigned_verifier(
+            job_id, profile["id"]
+         )
+         if not is_assigned:
+            return {"error": "unauthorized"}
+    
+   # get stored output
    output_record = storage.get_output(job_id)
-   if output_record is None:
+   if not output_record:
       return {"error": "output not found"}
 
    if isinstance(output_record, dict):
@@ -20,13 +25,14 @@ def get_output(args: dict, contract, storage, caller_id: str) -> dict:
       stored_hash = output_record.get("output_hash")
    else:
       output = output_record
-      stored_hash = hashlib.sha256(output.encode()).hexdigest()
-
-   computed_hash = hashlib.sha256(output.encode()).hexdigest()
-
-   # TODO: verify caller_id is assigned verifier via contract
-   # TODO: compare computed_hash against onchain hash
-   if computed_hash != stored_hash:
+      stored_hash = None
+    
+   # verify hash matches onchain
+   computed_hash = "0x" + hashlib.sha256(output.encode()).digest().hex()
+   job = contract.get_job(job_id)
+   onchain_hash = job.get("outputHash")
+    
+   if onchain_hash and computed_hash != onchain_hash:
       return {"error": "output tampered"}
-
+    
    return {"output": output, "output_hash": computed_hash}

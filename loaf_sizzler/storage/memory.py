@@ -19,7 +19,7 @@ class MemoryStorage(BaseStorage):
     def get_messages_by_type(self, message_type: str) -> list:
         return [message for message in self._inbox if message.get("type") == message_type]
 
-    def store_output(self, job_id: str, output: str, output_hash: str) -> None:
+    def store_output(self, job_id: str, output: str, output_hash: str | None = None) -> None:
         self._outputs[job_id] = {"output": output, "output_hash": output_hash}
 
     def get_output(self, job_id: str) -> dict | None:

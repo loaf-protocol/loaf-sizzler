@@ -67,7 +67,7 @@ class SQLiteStorage(BaseStorage):
         )
         return [json.loads(row[0]) for row in cursor.fetchall()]
 
-    def store_output(self, job_id: str, output: str, output_hash: str) -> None:
+    def store_output(self, job_id: str, output: str, output_hash: str | None = None) -> None:
         self.conn.execute(
             """
             INSERT INTO outputs (job_id, output, output_hash)
@@ -77,7 +77,7 @@ class SQLiteStorage(BaseStorage):
                 output_hash = excluded.output_hash,
                 stored_at = CURRENT_TIMESTAMP
             """,
-            (job_id, output, output_hash),
+            (job_id, output, output_hash or ""),
         )
         self.conn.commit()
 
