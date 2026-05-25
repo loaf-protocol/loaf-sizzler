@@ -1,22 +1,27 @@
 import hashlib
 import json
+import os
 import time
 
 import requests
 
-BASE_A = "http://localhost:7100/mcp"
-BASE_B = "http://localhost:7101/mcp"
+BASE_A = os.getenv("LOAF_E2E_BASE_A", "http://localhost:7100/mcp")
+BASE_B = os.getenv("LOAF_E2E_BASE_B", "http://localhost:7101/mcp")
 
-AXL_A = "8b6a18ac96f7c30c85689627f47625eed10d3309f91be8aa8f47141b9eb1cb9f"
-AXL_B = "8176eb050803ffea4407d02f738102a5c7c726e2d2ecfdd9bc0c3bcd672a78cb"
+AXL_A = os.getenv("LOAF_E2E_AXL_A", "8b6a18ac96f7c30c85689627f47625eed10d3309f91be8aa8f47141b9eb1cb9f")
+AXL_B = os.getenv("LOAF_E2E_AXL_B", "8176eb050803ffea4407d02f738102a5c7c726e2d2ecfdd9bc0c3bcd672a78cb")
+PROFILE_A = os.getenv("LOAF_E2E_PROFILE_A", "1")
+PROFILE_B = os.getenv("LOAF_E2E_PROFILE_B", "2")
 
-JOB_ID = "e2e_test_job_001"
+JOB_ID = os.getenv("LOAF_E2E_JOB_ID", "1")
+PROPOSED_AMOUNT = os.getenv("LOAF_E2E_PROPOSED_AMOUNT", "1000000")
 OUTPUT = "analysis complete: sentiment is positive with 87% confidence"
 CRITERIA = "perform sentiment analysis and return confidence score"
 
 
-def call(base_url: str, tool: str, args: dict, headers: dict = {}) -> dict:
+def call(base_url: str, tool: str, args: dict, headers: dict | None = None) -> dict:
     """Call a loaf-sizzler MCP tool and return result."""
+    request_headers = {"Content-Type": "application/json", **(headers or {})}
     try:
         response = requests.post(
             base_url,
@@ -29,7 +34,7 @@ def call(base_url: str, tool: str, args: dict, headers: dict = {}) -> dict:
                     "arguments": args,
                 },
             },
-            headers={"Content-Type": "application/json", **headers},
+            headers=request_headers,
             timeout=10,
         )
         return response.json()
@@ -41,7 +46,7 @@ def call(base_url: str, tool: str, args: dict, headers: dict = {}) -> dict:
                 "base_url": base_url,
                 "tool": tool,
                 "args": args,
-                "headers": headers,
+                "headers": request_headers,
             },
         }
     except ValueError as e:
@@ -52,7 +57,7 @@ def call(base_url: str, tool: str, args: dict, headers: dict = {}) -> dict:
                 "base_url": base_url,
                 "tool": tool,
                 "args": args,
-                "headers": headers,
+                "headers": request_headers,
             },
         }
 
@@ -111,7 +116,7 @@ def test_phase_1_bidding():
         {
             "poster_axl_key": AXL_B,
             "job_id": JOB_ID,
-            "criteria": CRITERIA,
+            "proposed_amount": PROPOSED_AMOUNT,
         },
     )
     assert_ok(bid, "status", "bid_sent", "A sent bid to B")
@@ -129,8 +134,10 @@ def test_phase_2_acceptance():
         BASE_B,
         "accept_bid",
         {
-            "bidder_axl_key": AXL_A,
             "job_id": JOB_ID,
+            "worker_profile_id": PROFILE_A,
+            "agreed_worker_amount": PROPOSED_AMOUNT,
+            "worker_axl_key": AXL_A,
         },
     )
     assert_ok(accept, "status", "accepted", "B accepted A bid")
@@ -155,7 +162,7 @@ def test_phase_3_submit_work():
     )
     assert_ok(result, "status", "submitted", "A submitted work")
 
-    expected_hash = hashlib.sha256(OUTPUT.encode()).hexdigest()
+    expected_hash = "0x" + hashlib.sha256(OUTPUT.encode()).hexdigest()
     try:
         output_hash = result["result"]["output_hash"]
         if output_hash == expected_hash:
@@ -187,21 +194,22 @@ def test_phase_4_verify_bid():
     assert_contains(inbox_a, "verify_bid", "A inbox contains verify_bid")
 
 
-def test_phase_5_accept_verifier():
+def test_phase_5_assign_verifier():
     """
-    A accepts B as verifier.
+    A assigns B as verifier.
     B checks inbox — sees verifier_acceptance with worker_axl_key.
     """
-    accept = call(
+    assign = call(
         BASE_A,
-        "accept_verifier",
+        "assign_verifier",
         {
             "verifier_axl_key": AXL_B,
             "job_id": JOB_ID,
+            "verifier_profile_id": PROFILE_B,
             "worker_axl_key": AXL_A,
         },
     )
-    assert_ok(accept, "status", "accepted", "A accepted B as verifier")
+    assert_ok(assign, "status", "assigned", "A assigned B as verifier")
 
     inbox_b = call(BASE_B, "get_inbox", {})
     assert_contains(inbox_b, "verifier_acceptance", "B inbox contains verifier_acceptance")
@@ -229,7 +237,7 @@ def test_phase_6_get_output():
     result = call(
         BASE_A,
         "get_output",
-        {"job_id": JOB_ID},
+        {"job_id": JOB_ID, "verifier_profile_id": PROFILE_B},
         headers={"X-From-Peer-Id": AXL_B},
     )
 
@@ -244,7 +252,7 @@ def test_phase_6_get_output():
         print(f"  ❌ get_output missing output — exception: {e}")
         _dump_failure(result)
 
-    expected_hash = hashlib.sha256(OUTPUT.encode()).hexdigest()
+    expected_hash = "0x" + hashlib.sha256(OUTPUT.encode()).hexdigest()
     try:
         output_hash = result["result"]["output_hash"]
         if output_hash == expected_hash:
@@ -314,8 +322,8 @@ def run_all():
     test_phase_4_verify_bid()
     time.sleep(1)
 
-    print("\n[phase 5] accept verifier...")
-    test_phase_5_accept_verifier()
+    print("\n[phase 5] assign verifier...")
+    test_phase_5_assign_verifier()
     time.sleep(1)
 
     print("\n[phase 6] get output...")

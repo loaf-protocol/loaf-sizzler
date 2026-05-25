@@ -5,10 +5,63 @@ from __future__ import annotations
 import os
 import time
 import json
+from decimal import Decimal, InvalidOperation
 
 import requests
 
 from loaf_sizzler.config import LoafConfig
+
+
+JOB_STATES = {
+    "open": 0,
+    "active": 1,
+    "in_review": 2,
+    "review": 2,
+    "settled": 3,
+    "resolved": 3,
+    "expired": 4,
+    "cancelled": 5,
+}
+JOB_STATE_NAMES = {value: key for key, value in JOB_STATES.items() if key not in {"review", "resolved"}}
+USDC_DECIMALS = 6
+USDC_SCALE = Decimal(10) ** USDC_DECIMALS
+
+
+def parse_usdc_amount(value, field_name: str = "amount") -> int:
+    """
+    Convert user-facing USDC decimals to raw 6-decimal units.
+    Integer values and integer strings are treated as already-raw units.
+    Decimal strings/floats are treated as USDC amounts.
+    """
+    if isinstance(value, bool):
+        raise ValueError(f"{field_name} must be a USDC amount, not a boolean")
+
+    if isinstance(value, int):
+        raw = value
+    else:
+        text = str(value).strip()
+        if not text:
+            raise ValueError(f"{field_name} is required")
+
+        try:
+            decimal_value = Decimal(text)
+        except InvalidOperation as exc:
+            raise ValueError(f"{field_name} must be a valid USDC amount") from exc
+
+        if decimal_value == decimal_value.to_integral_value() and "." not in text and "e" not in text.lower():
+            raw = int(decimal_value)
+        else:
+            raw_decimal = decimal_value * USDC_SCALE
+            if raw_decimal != raw_decimal.to_integral_value():
+                raise ValueError(
+                    f"{field_name} is below USDC precision or has too many decimals; "
+                    f"minimum non-zero amount is 0.000001 USDC"
+                )
+            raw = int(raw_decimal)
+
+    if raw <= 0:
+        raise ValueError(f"{field_name} must be greater than 0")
+    return raw
 
 
 class ContractClient:
@@ -30,6 +83,7 @@ class ContractClient:
         # load local workflow config (duplicated into user's org)
         try:
             self.config = LoafConfig()
+            self._wallet_address = self.config.wallet_address
         except SystemExit:
             # LoafConfig will exit with helpful message if missing; re-raise
             raise
@@ -207,9 +261,15 @@ class ContractClient:
         return None
 
     def _extract_profile_id(self, payload: dict) -> int | None:
-        for key in ("profileId", "profile_id", "id"):
-            if payload.get(key) is not None:
-                return int(payload[key])
+        if isinstance(payload, dict):
+            for key in ("profileId", "profile_id", "id"):
+                if payload.get(key) is not None:
+                    return int(payload[key])
+            result = payload.get("result")
+            if isinstance(result, list) and result:
+                return int(result[0])
+        elif isinstance(payload, list) and payload:
+            return int(payload[0])
         return None
 
     def _ensure_registered(self) -> int:
@@ -234,7 +294,15 @@ class ContractClient:
             return self._profile_id
 
         print("[loaf-sizzler] first time setup — registering agent profile...")
-        self._profile_id = self._register()
+        try:
+            self._profile_id = self._register()
+        except RuntimeError as exc:
+            if "AlreadyRegistered" not in str(exc):
+                raise
+            profile = self.get_profile_by_address()
+            if not profile.get("exists"):
+                raise
+            self._profile_id = int(profile["id"])
         self.storage.set_agent_data("profile_id", str(self._profile_id))
         print(f"[loaf-sizzler] profile registered: id={self._profile_id}")
         return self._profile_id
@@ -262,9 +330,10 @@ class ContractClient:
         Returns profile dict with exists field.
         If not found returns { "exists": False }
         """
+        lookup_address = address or self._wallet_address or (self.config.wallet_address if self.config else None)
         inputs = {}
-        if address:
-            inputs["addr"] = address
+        if lookup_address:
+            inputs["addr"] = lookup_address
 
         result = self._run_workflow("get_profile_addr", inputs)
         if result.get("error"):
@@ -313,7 +382,7 @@ class ContractClient:
         result = self._run_workflow("get_job", {"jobId": int(job_id)})
         if result.get("error"):
             return result
-        return result
+        return self._normalize_job_payload(result, int(job_id))
 
     def _get_job_ids_by_state(self, state: int) -> list[int] | dict:
         result = self._run_workflow("get_jobs_by_state", {"state": int(state)})
@@ -321,24 +390,81 @@ class ContractClient:
             return result
 
         ids = result.get("jobIds") or result.get("ids") or result.get("jobs") or []
+        if not ids and isinstance(result.get("result"), list):
+            ids = result["result"]
         if isinstance(ids, list):
-            return [int(job_id) for job_id in ids]
+            parsed = []
+            for item in ids:
+                if isinstance(item, (list, tuple)) and item:
+                    parsed.append(int(item[0]))
+                else:
+                    parsed.append(int(item))
+            return parsed
         return []
 
-    def list_jobs(self) -> list:
-        """
-        Get OPEN jobs (state=0).
-        Calls get_jobs_by_state then get_job for each ID.
-        Enriches each job with poster axlPublicKey from profile.
-        Returns list of job dicts.
-        """
-        ids = self._get_job_ids_by_state(0)
-        if isinstance(ids, dict):
-            return []
+    def _normalize_job_state(self, state: int | str | None) -> int | str:
+        if state is None:
+            return JOB_STATES["open"]
 
+        if isinstance(state, int):
+            return state
+
+        state_text = str(state).strip().lower().replace("-", "_").replace(" ", "_")
+        if state_text == "all":
+            return "all"
+        if state_text.isdigit():
+            return int(state_text)
+        if state_text in JOB_STATES:
+            return JOB_STATES[state_text]
+
+        allowed = ", ".join(sorted({*JOB_STATES.keys(), "all"}))
+        raise ValueError(f"unknown job state '{state}'. Use one of: {allowed}")
+
+    def _normalize_job_payload(self, payload: dict, fallback_job_id: int | None = None) -> dict:
+        values = payload.get("result") if isinstance(payload, dict) else None
+        if not isinstance(values, list):
+            return payload
+
+        job = {
+            **payload,
+            "jobId": fallback_job_id,
+            "posterProfileId": int(values[0]) if len(values) > 0 else None,
+            "workerProfileId": int(values[1]) if len(values) > 1 else 0,
+            "verifierIds": values[2] if len(values) > 2 else [],
+            "criteria": values[3] if len(values) > 3 else "",
+            "outputHash": values[4] if len(values) > 4 else "",
+            "workerAmount": int(values[5]) if len(values) > 5 else 0,
+            "verifierFeeEach": int(values[6]) if len(values) > 6 else 0,
+            "verifierCount": int(values[7]) if len(values) > 7 else 0,
+            "quorumThreshold": int(values[8]) if len(values) > 8 else 0,
+            "minVerifierScore": int(values[9]) if len(values) > 9 else 0,
+            "acceptedWorkerAmount": int(values[10]) if len(values) > 10 else 0,
+            "expiresAt": int(values[12]) if len(values) > 12 else 0,
+            "state": int(values[13]) if len(values) > 13 else None,
+        }
+        if job["state"] is not None:
+            job["stateName"] = JOB_STATE_NAMES.get(job["state"], str(job["state"]))
+        return job
+
+    def _job_matches_state(self, job: dict, state: int) -> bool:
+        try:
+            return int(job.get("state")) == int(state)
+        except Exception:
+            return False
+
+    def _scan_jobs_by_state(self, state: int | None = None, limit: int = 100) -> list:
         jobs = []
-        for job_id in ids:
+        for job_id in range(1, limit + 1):
             job = self.get_job(job_id)
+            if not isinstance(job, dict) or job.get("error"):
+                continue
+            if state is None or self._job_matches_state(job, state):
+                jobs.append(job)
+        return self._enrich_job_records(jobs)
+
+    def _enrich_job_records(self, jobs: list[dict]) -> list:
+        enriched = []
+        for job in jobs:
             if not isinstance(job, dict) or job.get("error"):
                 continue
 
@@ -354,35 +480,62 @@ class ContractClient:
                 if axl_key:
                     job["poster_axl_key"] = axl_key
 
-            jobs.append(job)
-        return jobs
+            enriched.append(job)
+        return enriched
 
-    def list_review_jobs(self) -> list:
-        """
-        Get IN_REVIEW jobs (state=2).
-        Same pattern as list_jobs.
-        """
-        ids = self._get_job_ids_by_state(2)
-        if isinstance(ids, dict):
-            return []
-
+    def _enrich_jobs(self, ids: list[int]) -> list:
         jobs = []
         for job_id in ids:
             job = self.get_job(job_id)
-            if isinstance(job, dict) and not job.get("error"):
-                poster_profile_id = (
-                    job.get("posterProfileId")
-                    or job.get("poster_profile_id")
-                    or job.get("posterId")
-                    or job.get("poster_id")
-                )
-                if poster_profile_id is not None:
-                    profile = self.get_profile(int(poster_profile_id))
-                    axl_key = profile.get("axlPublicKey") or profile.get("axlKey") or profile.get("axl_key")
-                    if axl_key:
-                        job["poster_axl_key"] = axl_key
-                jobs.append(job)
+            if not isinstance(job, dict) or job.get("error"):
+                continue
+            jobs.append(job)
+        return self._enrich_job_records(jobs)
+
+    def list_jobs(self, state: int | str | None = None) -> list | dict:
+        """
+        Get jobs by state. Defaults to OPEN.
+        Calls get_jobs_by_state then get_job for each ID.
+        Enriches each job with poster axlPublicKey from profile.
+        Returns list of job dicts.
+        """
+        try:
+            normalized_state = self._normalize_job_state(state)
+        except ValueError as exc:
+            return {"error": str(exc)}
+
+        if normalized_state == "all":
+            all_jobs = []
+            seen = set()
+            for state_id in sorted(set(JOB_STATES.values())):
+                ids = self._get_job_ids_by_state(state_id)
+                if isinstance(ids, dict):
+                    continue
+                for job in self._enrich_jobs(ids):
+                    job_id = job.get("jobId") or job.get("job_id") or job.get("id")
+                    if job_id is not None and job_id in seen:
+                        continue
+                    if job_id is not None:
+                        seen.add(job_id)
+                    all_jobs.append(job)
+            if not all_jobs:
+                return self._scan_jobs_by_state(None)
+            return all_jobs
+
+        ids = self._get_job_ids_by_state(normalized_state)
+        if isinstance(ids, dict):
+            return ids
+        jobs = self._enrich_jobs(ids)
+        if not jobs:
+            return self._scan_jobs_by_state(normalized_state)
         return jobs
+
+    def list_review_jobs(self) -> list | dict:
+        """
+        Get IN_REVIEW jobs (state=2).
+        Compatibility alias for list_jobs(state="in_review").
+        """
+        return self.list_jobs("in_review")
 
     def get_verifier_ids(self, job_id: int) -> list:
         """Get assigned verifier profileIds for a job."""
@@ -492,12 +645,18 @@ class ContractClient:
         except Exception as exc:
             return {"error": str(exc)}
 
+        try:
+            worker_amount_raw = parse_usdc_amount(worker_amount, "worker_amount")
+            verifier_fee_each_raw = parse_usdc_amount(verifier_fee_each, "verifier_fee_each")
+        except ValueError as exc:
+            return {"error": str(exc)}
+
         result = self._run_workflow(
             "post_job",
             {
                 "criteria": criteria,
-                "WorkAmount": int(worker_amount),
-                "VerifierFeeEach": int(verifier_fee_each),
+                "WorkAmount": worker_amount_raw,
+                "VerifierFeeEach": verifier_fee_each_raw,
                 "VerifierCount": int(verifier_count),
                 "QuorumThreshold": int(quorum_threshold),
                 "MinimumVerifierScore": int(min_verifier_score),
@@ -530,7 +689,12 @@ class ContractClient:
 
         verifier_fee_each = int(job.get("verifierFeeEach") or job.get("verifier_fee_each") or 0)
         verifier_count = int(job.get("verifierCount") or job.get("verifier_count") or 0)
-        total = int(agreed_worker_amount) + (verifier_fee_each * verifier_count)
+        try:
+            agreed_worker_amount_raw = parse_usdc_amount(agreed_worker_amount, "agreed_worker_amount")
+        except ValueError as exc:
+            return {"error": str(exc)}
+
+        total = agreed_worker_amount_raw + (verifier_fee_each * verifier_count)
 
         approval = self.approve_usdc(total)
         if approval.get("error"):
@@ -541,13 +705,13 @@ class ContractClient:
             {
                 "jobId": int(job_id),
                 "workerProfileId": int(worker_profile_id),
-                "agreedWorkerAmount": int(agreed_worker_amount),
+                "agreedWorkerAmount": agreed_worker_amount_raw,
             },
         )
         if result.get("error"):
             return result
 
-        return {"tx_hash": self._extract_tx_hash(result)}
+        return {"status": "accepted", "tx_hash": self._extract_tx_hash(result)}
 
     def assign_verifier(self, job_id: int, verifier_profile_id: int) -> dict:
         """
@@ -570,7 +734,7 @@ class ContractClient:
         if result.get("error"):
             return result
 
-        return {"tx_hash": self._extract_tx_hash(result)}
+        return {"status": "assigned", "tx_hash": self._extract_tx_hash(result)}
 
     def submit_work(self, job_id: int, output_hash: bytes | str) -> dict:
         """
@@ -599,7 +763,7 @@ class ContractClient:
         if result.get("error"):
             return result
 
-        return {"tx_hash": self._extract_tx_hash(result)}
+        return {"status": "submitted", "tx_hash": self._extract_tx_hash(result)}
 
     def submit_verdict(self, job_id: int, passed: bool) -> dict:
         """
@@ -622,7 +786,7 @@ class ContractClient:
         if result.get("error"):
             return result
 
-        return {"tx_hash": self._extract_tx_hash(result)}
+        return {"status": "verdict_sent", "tx_hash": self._extract_tx_hash(result)}
 
     def approve_usdc(self, amount: int) -> dict:
         """
@@ -630,19 +794,24 @@ class ContractClient:
         Called internally by accept_bid.
         Return { tx_hash }
         """
+        try:
+            amount_raw = parse_usdc_amount(amount, "amount")
+        except ValueError as exc:
+            return {"error": str(exc)}
+
         result = self._run_workflow(
             "approve_usdc",
             {
                 "token": self.usdc_address,
                 "spender": self.contract_address,
-                "amount": int(amount),
+                "amount": amount_raw,
                 "network": self.network,
             },
         )
         if result.get("error"):
             return result
 
-        return {"tx_hash": self._extract_tx_hash(result)}
+        return {"status": "approved", "tx_hash": self._extract_tx_hash(result)}
 
     def claim_expired(self, job_id: int) -> dict:
         """
@@ -659,7 +828,7 @@ class ContractClient:
         if result.get("error"):
             return result
 
-        return {"tx_hash": self._extract_tx_hash(result)}
+        return {"status": "claimed", "tx_hash": self._extract_tx_hash(result)}
 
     def update_axl_key(self, new_key: str) -> dict:
         """
@@ -676,14 +845,26 @@ class ContractClient:
         if result.get("error"):
             return result
 
-        return {"tx_hash": self._extract_tx_hash(result)}
+        return {"status": "updated", "tx_hash": self._extract_tx_hash(result)}
 
     def get_balance(self) -> dict:
         """
         Get USDC balance of user's Para wallet.
-        Returns { usdc, wallet_address }
+        Returns configured wallet metadata.
         """
+        wallet_address = self._wallet_address
+        if not wallet_address and self.config:
+            wallet_address = self.config.wallet_address
+            self._wallet_address = wallet_address
+
+        if not wallet_address:
+            return {"error": "wallet_address missing from .loaf_config.json. Run: loaf-sizzler setup"}
+
         return {
             "usdc": 0,
-            "wallet_address": self._wallet_address,
+            "wallet_address": wallet_address,
+            "usdc_address": self.usdc_address,
+            "network": self.network,
+            "source": ".loaf_config.json",
+            "note": "USDC balance lookup is not implemented yet; wallet address is loaded from local setup config.",
         }

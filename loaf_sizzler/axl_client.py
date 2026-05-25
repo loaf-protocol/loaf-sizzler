@@ -1,12 +1,12 @@
 """AXL messaging client for loaf-sizzler."""
 
-import json
 import os
 
 import requests
 
 
 AXL_NODE_URL = os.getenv("AXL_NODE_URL", "http://localhost:9002")
+DEFAULT_TIMEOUT = 10
 
 
 class AxlClient:
@@ -31,8 +31,8 @@ class AxlClient:
                 },
             }
             print(f"[axl] POST to: {url}")
-            print(f"[axl] body: {json.dumps(body)}")
-            response = requests.post(url, json=body)
+            print(f"[axl] message type: {message.get('type')}")
+            response = requests.post(url, json=body, timeout=DEFAULT_TIMEOUT)
             print(f"[axl] response status: {response.status_code}")
             print(f"[axl] response body: {response.text}")
             return response.json()
@@ -102,7 +102,7 @@ class AxlClient:
             },
         )
 
-    def request_output(self, worker_axl_key: str, job_id: str) -> dict:
+    def request_output(self, worker_axl_key: str, job_id: str, verifier_profile_id: int | str) -> dict:
         """Request output from worker by calling the public get_output MCP tool."""
         try:
             response = requests.post(
@@ -113,9 +113,13 @@ class AxlClient:
                     "id": 1,
                     "params": {
                         "name": "get_output",
-                        "arguments": {"job_id": job_id},
+                        "arguments": {
+                            "job_id": job_id,
+                            "verifier_profile_id": verifier_profile_id,
+                        },
                     },
                 },
+                headers={"X-From-Peer-Id": self.get_own_key()},
                 timeout=10,
             )
             return response.json()
@@ -130,6 +134,6 @@ class AxlClient:
         """
         if self.own_key:
             return self.own_key
-        response = requests.get(f"{self.node_url}/topology")
+        response = requests.get(f"{self.node_url}/topology", timeout=DEFAULT_TIMEOUT)
         self.own_key = response.json()["our_public_key"]
         return self.own_key
